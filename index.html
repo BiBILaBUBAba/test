@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>p5.js 彩色粒子流动动画</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #1a1a1a; /* 网页背景深灰，突出画布 */
+            overflow: hidden;
+        }
+        canvas {
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+    <!-- 引入 p5.js 库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+
+<script>
+    let particles = [];
+    const numParticles = 2000; // 粒子数量
+    const noiseScale = 0.01;   // 噪声缩放比例，影响流动的平滑度
+    let zOff = 0;              // 噪声的时间维度偏移量
+
+    function setup() {
+        createCanvas(600, 400);
+        colorMode(HSB, 360, 100, 100, 100); // 使用 HSB 颜色模式方便生成彩虹色
+        background(0); // 初始背景黑色
+        
+        // 初始化粒子
+        for (let i = 0; i < numParticles; i++) {
+            particles.push(new Particle());
+        }
+    }
+
+    function draw() {
+        // 使用半透明黑色背景覆盖上一帧，产生拖尾效果
+        // 透明度越低，拖尾越长
+        noStroke();
+        fill(0, 0, 0, 5); 
+        rect(0, 0, width, height);
+
+        // 更新和绘制每个粒子
+        for (let p of particles) {
+            p.follow();
+            p.update();
+            p.edges();
+            p.show();
+        }
+
+        // 增加时间偏移量，让流动场随时间缓慢变化
+        zOff += 0.003;
+    }
+
+    // 粒子类定义
+    class Particle {
+        constructor() {
+            this.pos = createVector(random(width), random(height));
+            this.vel = createVector(0, 0);
+            this.acc = createVector(0, 0);
+            this.maxSpeed = 2; // 最大速度
+            this.prevPos = this.pos.copy();
+            // 每个粒子有一个基础色相，随时间微变
+            this.hue = random(360); 
+        }
+
+        follow() {
+            // 根据当前位置计算噪声值，得到角度
+            let n = noise(this.pos.x * noiseScale, this.pos.y * noiseScale, zOff);
+            let angle = n * TWO_PI * 2; // 将噪声映射到角度
+            
+            // 创建指向该角度的力向量
+            let force = p5.Vector.fromAngle(angle);
+            force.setMag(1); // 力的大小
+            this.applyForce(force);
+        }
+
+        applyForce(force) {
+            this.acc.add(force);
+        }
+
+        update() {
+            this.vel.add(this.acc);
+            this.vel.limit(this.maxSpeed);
+            this.pos.add(this.vel);
+            this.acc.mult(0); // 重置加速度
+            
+            // 颜色随时间循环变化
+            this.hue = (this.hue + 0.5) % 360;
+        }
+
+        // 边界处理：循环环绕
+        edges() {
+            if (this.pos.x > width) {
+                this.pos.x = 0;
+                this.updatePrev(); // 防止连线跨越屏幕
+            }
+            if (this.pos.x < 0) {
+                this.pos.x = width;
+                this.updatePrev();
+            }
+            if (this.pos.y > height) {
+                this.pos.y = 0;
+                this.updatePrev();
+            }
+            if (this.pos.y < 0) {
+                this.pos.y = height;
+                this.updatePrev();
+            }
+        }
+
+        updatePrev() {
+            this.prevPos.x = this.pos.x;
+            this.prevPos.y = this.pos.y;
+        }
+
+        show() {
+            stroke(this.hue, 80, 100, 50); // 设置颜色：色相, 饱和度, 亮度, 透明度
+            strokeWeight(1);
+            
+            // 绘制从上一帧位置到当前位置的线，使运动更平滑
+            line(this.prevPos.x, this.prevPos.y, this.pos.x, this.pos.y);
+            
+            this.updatePrev();
+        }
+    }
+</script>
+
+</body>
+</html>
